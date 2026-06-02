@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { groups, courses, enrollments, teachers } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, like } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
@@ -8,15 +8,18 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  // Find teacher by name (users.name matches teachers.nombres + apellidos)
+  // Match teacher by name (partial match on apellidos since user.name may not include full apellidos)
   const nameParts = session.name.split(" ");
   const nombres = nameParts[0] || "";
-  const apellidos = nameParts.slice(1).join(" ") || "";
+  const apellidoFirst = nameParts[1] || "";
 
   const [teacher] = await db
     .select({ id: teachers.id })
     .from(teachers)
-    .where(and(eq(teachers.nombres, nombres), eq(teachers.apellidos, apellidos)))
+    .where(and(
+      eq(teachers.nombres, nombres),
+      like(teachers.apellidos, `${apellidoFirst}%`)
+    ))
     .limit(1);
 
   if (!teacher) return NextResponse.json({ groups: [] });
