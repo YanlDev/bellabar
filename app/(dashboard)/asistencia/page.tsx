@@ -18,7 +18,24 @@ export default function AsistenciaPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [records, setRecords] = useState<R[]>([]);
   const [allStudents, setAllStudents] = useState<{id:number;names:string;lastnames:string;dni:string}[]>([]);
-  useEffect(() => { (async()=>setGroups(await getGroups() as {id:number;codigo:string}[]))(); }, []);
+  const [role, setRole] = useState<string>("admin");
+
+  useEffect(() => {
+    fetch("/api/session").then(r => r.json()).then(d => {
+      if (!d.error) setRole(d.role);
+    });
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (role === "teacher") {
+        const r = await fetch("/api/docente").then(r => r.json());
+        setGroups((r.groups || []).map((g: any) => ({ id: g.id, codigo: g.codigo })));
+      } else {
+        setGroups(await getGroups() as { id: number; codigo: string }[]);
+      }
+    })();
+  }, [role]);
 
   async function loadAttendance() { if(!selectedGroup) return; setRecords(await getAttendanceByGroup(selectedGroup, fecha) as R[]); }
   async function loadStudents() {

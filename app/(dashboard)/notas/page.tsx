@@ -23,7 +23,24 @@ export default function NotasPage() {
   const [sGrades, setSGrades] = useState<G[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [gVals, setGVals] = useState<Record<number,number>>({});
-  useEffect(() => { (async()=>setGroups(await getGroups() as any[]))(); }, []);
+  const [role, setRole] = useState<string>("admin");
+
+  useEffect(() => {
+    fetch("/api/session").then(r => r.json()).then(d => {
+      if (!d.error) setRole(d.role);
+    });
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (role === "teacher") {
+        const r = await fetch("/api/docente").then(r => r.json());
+        setGroups((r.groups || []).map((g: any) => ({ id: g.id, codigo: g.codigo })));
+      } else {
+        setGroups(await getGroups() as any[]);
+      }
+    })();
+  }, [role]);
 
   async function load() {
     if(!selectedGroup) return;

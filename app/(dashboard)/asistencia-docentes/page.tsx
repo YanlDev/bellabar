@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogIn, LogOut, Clock, UserCheck } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { getTeachers } from "@/lib/actions/docentes";
 import { getTeacherAttendance, registerTeacherEntry, registerTeacherExit } from "@/lib/actions/docente-attendance";
 
@@ -16,6 +16,7 @@ export default function AsistenciaDocentesPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [teachers, setTeachers] = useState<T[]>([]);
   const [records, setRecords] = useState<TA[]>([]);
+  const [role, setRole] = useState<string>("admin");
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [salidaOpen, setSalidaOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<T | null>(null);
@@ -24,11 +25,32 @@ export default function AsistenciaDocentesPage() {
   const [salidaRecord, setSalidaRecord] = useState<TA | null>(null);
   const [observacion, setObservacion] = useState("");
 
-  useEffect(() => { loadTeachers(); }, []);
-  useEffect(() => { load(); }, [fecha]);
+  useEffect(() => {
+    fetch("/api/session").then(r => r.json()).then(d => {
+      if (!d.error) setRole(d.role);
+    });
+  }, []);
+
+  useEffect(() => { if (role === "admin") loadTeachers(); }, [role]);
+  useEffect(() => { load(); }, [fecha, role]);
 
   async function loadTeachers() { setTeachers(await getTeachers() as T[]); }
-  async function load() { setRecords(await getTeacherAttendance(fecha) as TA[]); }
+
+  async function load() {
+    const all = await getTeacherAttendance(fecha) as TA[];
+    if (role === "teacher") {
+      // Filter to only show the logged-in teacher's records
+      const me = await fetch("/api/session").then(r => r.json());
+      if (!me.error) {
+        const myName = me.name;
+        setRecords(all.filter(r => `${r.teacherName} ${r.teacherLastname}` === myName));
+      } else {
+        setRecords([]);
+      }
+    } else {
+      setRecords(all);
+    }
+  }
 
   async function handleEntrada(e: React.FormEvent) {
     e.preventDefault();
@@ -46,12 +68,18 @@ export default function AsistenciaDocentesPage() {
     await load();
   }
 
+  const isAdmin = role === "admin";
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-wide text-[oklch(0.92_0.003_85)]">Asistencia Docentes</h1>
-          <p className="text-sm text-[oklch(0.55_0.01_75)] mt-1">Registro de entrada y salida</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-wide text-[oklch(0.92_0.003_85)]">
+            {isAdmin ? "Asistencia Docentes" : "Mi Asistencia"}
+          </h1>
+          <p className="text-sm text-[oklch(0.55_0.01_75)] mt-1">
+            {isAdmin ? "Registro de entrada y salida" : "Historial de asistencias"}
+          </p>
         </div>
       </div>
 
@@ -60,59 +88,64 @@ export default function AsistenciaDocentesPage() {
           <label className="text-[11px] uppercase tracking-wider font-medium text-[oklch(0.58_0.008_70)]">Fecha</label>
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inp+" w-40"} />
         </div>
-        <button onClick={() => { setSelectedTeacher(null); setEntradaOpen(true); }} className={btnP}>
-          <LogIn className="h-4 w-4" /> Registrar Entrada
-        </button>
-        <button onClick={() => { setSalidaRecord(null); setSalidaOpen(true); }} className={btnG}>
-          <LogOut className="h-4 w-4" /> Registrar Salida
-        </button>
+        {isAdmin && (
+          <>
+            <button onClick={() => { setSelectedTeacher(null); setEntradaOpen(true); }} className={btnP}>
+              <LogIn className="h-4 w-4" /> Registrar Entrada
+            </button>
+            <button onClick={() => { setSalidaRecord(null); setSalidaOpen(true); }} className={btnG}>
+              <LogOut className="h-4 w-4" /> Registrar Salida
+            </button>
+          </>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[oklch(0.2_0.004_80)] bg-[oklch(0.145_0.003_85)]">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[oklch(0.19_0.004_80)]">
-              {["DNI","Docente","Entrada","Salida","Observación",""].map(h => <th key={h} className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">{h}</th>)}
+              {isAdmin && <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">Docente</th>}
+              <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">Fecha</th>
+              <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">Entrada</th>
+              <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">Salida</th>
+              <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium">Estatus</th>
+              {isAdmin && <th className="px-4 py-3 text-left text-[10px] uppercase tracking-[0.12em] text-[oklch(0.55_0.01_75)] font-medium"></th>}
             </tr>
           </thead>
           <tbody>
             {records.map(r => (
               <tr key={r.id} className="border-b border-[oklch(0.18_0.003_85)] hover:bg-[oklch(0.17_0.003_85)] transition-colors">
-                <td className="px-4 py-3 text-sm font-medium text-[oklch(0.9_0.003_85)]">{r.teacherDni}</td>
-                <td className="px-4 py-3 text-sm text-[oklch(0.82_0.005_78)]">{r.teacherName} {r.teacherLastname}</td>
-                <td className="px-4 py-3 text-sm">
-                  {r.horaEntrada ? (
-                    <span className="text-[oklch(0.6_0.1_155)] font-medium">{r.horaEntrada}</span>
-                  ) : (
-                    <span className="text-[oklch(0.48_0.008_72)]">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {r.horaSalida ? (
-                    <span className="text-[oklch(0.8_0.1_82)] font-medium">{r.horaSalida}</span>
-                  ) : (
-                    <span className="text-[oklch(0.62_0.12_22)] text-xs">Pendiente</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm text-[oklch(0.75_0.005_78)]">{r.observacion || "—"}</td>
+                {isAdmin && <td className="px-4 py-3 text-sm text-[oklch(0.82_0.005_78)]">{r.teacherName} {r.teacherLastname}</td>}
+                <td className="px-4 py-3 text-sm text-[oklch(0.75_0.005_78)]">{r.fecha}</td>
+                <td className="px-4 py-3 text-sm text-[oklch(0.6_0.1_155)] font-medium">{r.horaEntrada || "—"}</td>
+                <td className="px-4 py-3 text-sm text-[oklch(0.72_0.08_60)] font-medium">{r.horaSalida || "—"}</td>
                 <td className="px-4 py-3">
-                  {!r.horaSalida && (
-                    <button onClick={() => { setSalidaRecord(r); setSalidaOpen(true); }} className={btnG + " text-[oklch(0.8_0.1_82)]"}>
-                      <LogOut className="h-3.5 w-3.5" /> Salida
-                    </button>
-                  )}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    r.horaSalida ? "bg-[oklch(0.35_0.08_150/0.12)] text-[oklch(0.6_0.1_155)]" : "bg-[oklch(0.48_0.16_20/0.1)] text-[oklch(0.62_0.12_22)]"
+                  }`}>
+                    {r.horaSalida ? "Completo" : "Pendiente"}
+                  </span>
                 </td>
+                {isAdmin && (
+                  <td className="px-4 py-3">
+                    {!r.horaSalida && (
+                      <button onClick={() => { setSalidaRecord(r); setSalidaOpen(true); }} className={btnG + " text-[oklch(0.72_0.08_60)]"}>
+                        <LogOut className="h-3.5 w-3.5" /> Salida
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
             {records.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-[oklch(0.55_0.01_75)]">No hay registros para esta fecha.</td></tr>
+              <tr><td colSpan={isAdmin ? 6 : 4} className="px-4 py-8 text-center text-sm text-[oklch(0.55_0.01_75)]">No hay registros para esta fecha.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Entrada Dialog */}
-      {entradaOpen && (
+      {/* Admin dialogs remain */}
+      {entradaOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setEntradaOpen(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-[oklch(0.2_0.004_80)] bg-[oklch(0.145_0.003_85)] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h2 className="font-heading text-lg font-semibold text-[oklch(0.92_0.003_85)] mb-4 flex items-center gap-2"><LogIn className="h-5 w-5 text-[oklch(0.6_0.1_155)]" /> Registrar Entrada</h2>
@@ -137,11 +170,10 @@ export default function AsistenciaDocentesPage() {
         </div>
       )}
 
-      {/* Salida Dialog */}
-      {salidaOpen && (
+      {salidaOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setSalidaOpen(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-[oklch(0.2_0.004_80)] bg-[oklch(0.145_0.003_85)] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h2 className="font-heading text-lg font-semibold text-[oklch(0.92_0.003_85)] mb-4 flex items-center gap-2"><LogOut className="h-5 w-5 text-[oklch(0.8_0.1_82)]" /> Registrar Salida</h2>
+            <h2 className="font-heading text-lg font-semibold text-[oklch(0.92_0.003_85)] mb-4 flex items-center gap-2"><LogOut className="h-5 w-5 text-[oklch(0.72_0.08_60)]" /> Registrar Salida</h2>
             {salidaRecord ? (
               <form onSubmit={handleSalida} className="flex flex-col gap-4">
                 <p className="text-sm text-[oklch(0.75_0.005_78)]">
@@ -166,8 +198,8 @@ export default function AsistenciaDocentesPage() {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
                 const tid = Number(fd.get("teacherId"));
-                const recs = await getTeacherAttendance(fecha);
-                const rec = (recs as TA[]).filter(r => r.teacherId === tid && !r.horaSalida);
+                const recs = await getTeacherAttendance(fecha) as TA[];
+                const rec = recs.filter(r => r.teacherId === tid && !r.horaSalida);
                 if (!rec.length) { alert("No hay entrada registrada para este docente hoy."); return; }
                 setSalidaRecord(rec[0]);
               }}>
