@@ -17,22 +17,29 @@ import {
   LogOut,
 } from "lucide-react";
 
-const mainNav = [
+const adminMainNav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
 ];
 
-const academicNav = [
+const adminAcademicNav = [
   { href: "/cursos", label: "Cursos", icon: BookOpen },
   { href: "/docentes", label: "Docentes", icon: UserCheck },
   { href: "/estudiantes", label: "Estudiantes", icon: GraduationCap },
   { href: "/grupos", label: "Grupos", icon: Users },
 ];
 
-const operationsNav = [
+const adminOpsNav = [
   { href: "/matriculas", label: "Matrículas", icon: Calendar },
   { href: "/asistencia", label: "Asistencia", icon: ClipboardCheck },
   { href: "/asistencia-docentes", label: "Asist. Docentes", icon: LogIn },
   { href: "/pagos", label: "Pagos", icon: CreditCard },
+  { href: "/notas", label: "Notas", icon: Star },
+];
+
+const teacherNav = [
+  { href: "/docente", label: "Mis Grupos", icon: Users },
+  { href: "/asistencia", label: "Asistencia", icon: ClipboardCheck },
+  { href: "/asistencia-docentes", label: "Mi Asistencia", icon: LogIn },
   { href: "/notas", label: "Notas", icon: Star },
 ];
 
@@ -47,21 +54,26 @@ export default function Sidebar() {
       .catch(() => {});
   }, []);
 
+  const isAdmin = user?.role === "admin";
+
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-[oklch(0.125_0.003_85)] border-r border-[oklch(0.19_0.004_80)] flex flex-col">
-      {/* Branding */}
       <div className="flex flex-col items-center gap-2 pt-6 pb-4 border-b border-[oklch(0.19_0.004_80)] shrink-0">
         <img src="/Logo/logo.jpg" alt="Logo" className="h-10 w-10 object-cover rounded-xl shadow-md shadow-[oklch(0.72_0.12_85/0.15)] ring-1 ring-[oklch(0.72_0.12_85/0.2)]" />
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-        <NavSection items={mainNav} pathname={pathname} />
-        <NavSection label="Académico" items={academicNav} pathname={pathname} />
-        <NavSection label="Operaciones" items={operationsNav} pathname={pathname} />
+        {isAdmin ? (
+          <>
+            <NavSection items={adminMainNav} pathname={pathname} />
+            <NavSection label="Académico" items={adminAcademicNav} pathname={pathname} />
+            <NavSection label="Operaciones" items={adminOpsNav} pathname={pathname} />
+          </>
+        ) : (
+          <NavSection label="Docente" items={teacherNav} pathname={pathname} />
+        )}
       </nav>
 
-      {/* User */}
       {user && (
         <div className="border-t border-[oklch(0.19_0.004_80)] p-3 shrink-0">
           <div className="flex items-center justify-between rounded-xl px-3 py-2">
@@ -95,7 +107,7 @@ function NavSection({ label, items, pathname }: {
       )}
       <div className="flex flex-col gap-0.5">
         {items.map((item) => {
-          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          const active = pathname === item.href || (item.href !== "/docente" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
